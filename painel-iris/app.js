@@ -425,67 +425,126 @@ async function pAuditoria() {
   </tbody></table></div></div>`;
 }
 
-/* ---------------- Indicadores ---------------- */
-const GRUPO = { marcada: ['Consulta marcada', 'var(--ok)'], andamento: ['Em andamento', 'var(--sun)'], novo: ['Só conversou', 'var(--muted)'],
-  sem_vaga: ['Clínica sem vaga', 'var(--bad)'], cancelada: ['Cancelada', '#8A6FD1'], passada: ['Consulta já passou', 'var(--line)'] };
+/* ---------------- Indicadores (painel no estilo dashboard) ---------------- */
+const DC = { laranja: '#F58220', amarelo: '#FFC20E', vermelho: '#F5525D', verde: '#2FBF71', azul: '#3BA0E6', roxo: '#9B7FE6', cinza: '#6B7785' };
+const GRUPO = { marcada: ['Consulta marcada', DC.verde], andamento: ['Em andamento', DC.amarelo], novo: ['Só conversou', DC.cinza],
+  sem_vaga: ['Clínica sem vaga', DC.vermelho], cancelada: ['Cancelada', DC.roxo], passada: ['Consulta já passou', DC.azul] };
+const COR_ORIGEM = { cliente: DC.azul, iris: DC.laranja, clinica: DC.verde, equipe: DC.amarelo, sistema: DC.roxo };
 const pct = (a, b) => b ? Math.round((a / b) * 100) : 0;
+const nf = n => new Intl.NumberFormat('pt-BR').format(n || 0);
+const DICON = {
+  pessoas: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.8c1.7.8 2.9 2.5 3.5 5.2"/></svg>',
+  agenda: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>',
+  taxa: '<svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg>',
+  olho: '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  relogio: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+};
+// Rosca em SVG com o total no meio
+function rosca(itens, total, rotulo) {
+  const R = 52, C = 2 * Math.PI * R; let acc = 0;
+  const arcos = itens.filter(x => x.n).map(x => { const L = (x.n / (total || 1)) * C; const s = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x.c}" stroke-width="20" stroke-dasharray="${L} ${C - L}" stroke-dashoffset="${-acc}" transform="rotate(-90 70 70)"><title>${esc(x.t)}: ${x.n}</title></circle>`; acc += L; return s; }).join('');
+  return `<div class="d-rosca"><svg viewBox="0 0 140 140" role="img" aria-label="${esc(rotulo)}"><circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--d-line)" stroke-width="20"/>${arcos}
+    <text x="70" y="68" text-anchor="middle" class="d-big">${nf(total)}</text><text x="70" y="86" text-anchor="middle" class="d-small">${esc(rotulo)}</text></svg>
+    <ul>${itens.filter(x => x.n).map(x => `<li><i style="background:${x.c}"></i><span>${esc(x.t)}</span><b>${nf(x.n)}</b><em>${pct(x.n, total)}%</em></li>`).join('') || '<li class="d-vazio">Sem dados no período.</li>'}</ul></div>`;
+}
+// Barras horizontais com valor
+function dBarras(lista, cor) {
+  const mx = Math.max(1, ...lista.map(x => x[1]));
+  return lista.length ? `<div class="d-hbar">${lista.map(([t, n, c]) => `<span>${esc(t)}</span><div><i style="width:${Math.max(2, (n / mx) * 100)}%;background:${c || cor || DC.laranja}"><b>${nf(n)}</b></i></div>`).join('')}</div>` : '<p class="d-vazio">Ainda sem dados.</p>';
+}
+// Linha do tempo com média e valor em cada ponto
+function dLinha(serie) {
+  if (!serie.length) return '<p class="d-vazio">Ainda sem dados.</p>';
+  const W = window.innerWidth < 640 ? 360 : 640, H = window.innerWidth < 640 ? 260 : 230, pl = 18, pr = 18, pt = 30, pb = 34;
+  const mx = Math.max(1, ...serie.map(x => x[1]));
+  const media = serie.reduce((s, x) => s + x[1], 0) / serie.length;
+  const X = i => serie.length === 1 ? W / 2 : pl + (i * (W - pl - pr)) / (serie.length - 1);
+  const Y = v => pt + (1 - v / mx) * (H - pt - pb);
+  const pts = serie.map((x, i) => `${X(i).toFixed(1)},${Y(x[1]).toFixed(1)}`).join(' ');
+  const area = `${X(0).toFixed(1)},${H - pb} ${pts} ${X(serie.length - 1).toFixed(1)},${H - pb}`;
+  const passoRot = Math.ceil(serie.length / 12), passoVal = serie.length > 16 ? Math.ceil(serie.length / 16) : 1;
+  return `<svg class="d-linha" viewBox="0 0 ${W} ${H}" role="img" aria-label="Clientes ao longo do tempo">
+    <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${DC.laranja}" stop-opacity=".35"/><stop offset="1" stop-color="${DC.laranja}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="var(--d-line)"/>
+    <polygon points="${area}" fill="url(#dg)"/>
+    <line x1="${pl}" x2="${W - pr}" y1="${Y(media)}" y2="${Y(media)}" stroke="${DC.amarelo}" stroke-dasharray="5 5" opacity=".8"/>
+    <text x="${W - pr}" y="${Y(media) - 6}" text-anchor="end" class="d-media">Média: ${media.toFixed(1).replace('.', ',')}</text>
+    <polyline points="${pts}" fill="none" stroke="${DC.laranja}" stroke-width="2.5" stroke-linejoin="round"/>
+    ${serie.map((x, i) => `<circle cx="${X(i)}" cy="${Y(x[1])}" r="${serie.length > 40 ? 2 : 4}" fill="var(--d-card)" stroke="${DC.laranja}" stroke-width="2"><title>${esc(x[0])}: ${x[1]}</title></circle>
+      ${i % passoVal === 0 ? `<text x="${X(i)}" y="${Y(x[1]) - 9}" text-anchor="middle" class="d-val">${x[1]}</text>` : ''}
+      ${i % passoRot === 0 ? `<text x="${X(i)}" y="${H - 12}" text-anchor="middle" class="d-eixo">${esc(x[0])}</text>` : ''}`).join('')}
+  </svg>`;
+}
+// Agrupa os dias: até 31 dias por dia, 90 dias por semana, 1 ano por mês
+function serieTempo(porDia, dias) {
+  const mapa = Object.fromEntries((porDia || []).map(x => [x.d, x.n]));
+  const isoDe = t => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(t);
+  const lista = []; for (let i = dias - 1; i >= 0; i--) { const iso = isoDe(new Date(Date.now() - i * 864e5)); lista.push([iso, mapa[iso] || 0]); }
+  if (dias <= 31) return lista.map(([iso, n]) => [dataBR(iso).slice(0, 5), n]);
+  if (dias <= 120) { const out = []; for (let i = 0; i < lista.length; i += 7) { const g = lista.slice(i, i + 7); out.push([dataBR(g[0][0]).slice(0, 5), g.reduce((s, x) => s + x[1], 0)]); } return out; }
+  const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const porMes = new Map(); lista.forEach(([iso, n]) => { const k = iso.slice(0, 7); porMes.set(k, (porMes.get(k) || 0) + n); });
+  return [...porMes].map(([k, n]) => [MES[+k.slice(5, 7) - 1] + '/' + k.slice(2, 4), n]);
+}
 async function pIndicadores(d) {
   const main = $('main');
   const dias = ['7', '30', '90', '365'].includes(d) ? d : '30';
   main.innerHTML = `${crumbs('Indicadores')}<p class="spin">Carregando...</p>`;
   const { data: k, error } = await sb.rpc('painel_indicadores', { p_dias: Number(dias) });
   if (error) { falha(error); main.innerHTML = crumbs('Indicadores') + avisos(); S.erro = ''; return; }
-  const kpi = (n, t, sub) => `<div class="kpi"><span>${t}</span><b>${n}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
-  const tot = k.clientes_periodo;
-  // Rosca: situação dos clientes do período
-  let acc = 0;
-  const fatias = Object.entries(GRUPO).map(([g, [t, c]]) => ({ g, t, c, n: k.por_grupo[g] || 0 })).filter(x => x.n);
-  const grad = fatias.map(x => { const a = acc; acc += (x.n / (tot || 1)) * 360; return `${x.c} ${a}deg ${acc}deg`; }).join(',') || 'var(--sunk) 0 360deg';
-  const rosca = `<div class="donut"><div class="ring" style="background:conic-gradient(${grad})"><div class="mid"><b>${tot}</b>clientes</div></div>
-    <div class="leg">${fatias.map(x => `<div><i style="background:${x.c}"></i>${x.t}: <b>${x.n}</b> (${pct(x.n, tot)}%)</div>`).join('') || '<span class="hint">Sem clientes no período.</span>'}</div></div>`;
-  // Barras horizontais
-  const barras = (obj, rot, ordem) => { const it = ordem ? Object.entries(obj) : Object.entries(obj).sort((a, b) => b[1] - a[1]); const mx = Math.max(1, ...it.map(x => x[1]));
-    return it.length ? `<div class="hbar">${it.map(([a, n]) => `<span>${esc(rot ? rot(a) : a)}</span><div class="tr"><i style="width:${(n / mx) * 100}%"></i></div><em>${n}</em>`).join('')}</div>` : '<p class="empty">Ainda sem dados.</p>'; };
-  // Colunas por dia
-  const mapa = Object.fromEntries((k.por_dia || []).map(x => [x.d, x.n]));
-  const n = Number(dias) > 31 ? 0 : Number(dias); const diasArr = [];
-  for (let i = n - 1; i >= 0; i--) { const t = new Date(Date.now() - i * 864e5); const iso = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(t); diasArr.push(iso); }
-  const lista = n ? diasArr.map(x => [x, mapa[x] || 0]) : Object.entries(mapa).sort();
-  const mxD = Math.max(1, ...lista.map(x => x[1]));
-  const passo = Math.ceil(lista.length / 10);
-  const colunas = lista.length ? `<div class="cols" role="img" aria-label="Novos clientes por dia">${lista.map(([x, v]) => `<div class="${v ? '' : 'zero'}" style="height:${v ? Math.max(4, (v / mxD) * 100) : 2}%" title="${dataBR(x)}: ${v}"></div>`).join('')}</div>
-    <div class="cols-x">${lista.map(([x], i) => `<span>${i % passo === 0 ? dataBR(x).slice(0, 5) : ''}</span>`).join('')}</div>` : '<p class="empty">Ainda sem dados.</p>';
-  // Horário de pico (mensagens dos clientes)
-  const horas = Array.from({ length: 24 }, (_, h) => [h, k.msgs_por_hora[h] || 0]);
-  const mxH = Math.max(1, ...horas.map(x => x[1]));
-  const pico = k.msgs_total ? `<div class="cols" style="height:110px">${horas.map(([h, v]) => `<div class="${v ? '' : 'zero'}" style="height:${v ? Math.max(4, (v / mxH) * 100) : 2}%" title="${h}h: ${v}"></div>`).join('')}</div>
-    <div class="cols-x">${horas.map(([h]) => `<span>${h % 3 === 0 ? h + 'h' : ''}</span>`).join('')}</div>` : '<p class="empty">Começa a contar quando a gravação das conversas estiver ligada.</p>';
-  const SEM = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' };
-  const marc = k.marcadas;
+  const tot = k.clientes_periodo, marc = k.marcadas;
+  const kpi = (ic, n, t, sub, cor) => `<div class="d-kpi"><span class="d-ic" style="color:${cor}">${DICON[ic]}</span><div><small>${t}</small><b>${n}</b>${sub ? `<em>${sub}</em>` : ''}</div></div>`;
+  const grupos = Object.entries(GRUPO).map(([g, [t, c]]) => ({ t, c, n: k.por_grupo[g] || 0 }));
+  const msgs = Object.entries(k.msgs_por_origem || {}).map(([o, n]) => ({ t: ORIGEM[o] || o, c: COR_ORIGEM[o] || DC.cinza, n })).sort((a, b) => b.n - a.n);
+  const SEM = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+  const semana = SEM.map((t, i) => [t, (k.consultas_por_dia_semana || {})[i + 1] || 0]).filter(x => x[1] || SEM.indexOf(x[0]) < 6);
+  const origem = Object.entries(k.por_origem || {}).sort((a, b) => b[1] - a[1]).map(([t, n], i) => [t, n, [DC.laranja, DC.azul, DC.verde, DC.roxo, DC.amarelo][i % 5]]);
+  const funil = [['Clientes atendidos', tot, DC.azul], ['Consultas marcadas', marc, DC.laranja], ['Exames realizados', k.realizadas, DC.verde]];
+  const horas = Array.from({ length: 15 }, (_, i) => i + 7).map(h => [h + 'h', (k.msgs_por_hora || {})[h] || 0]);
+  const agora = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).format(new Date());
   main.innerHTML = `${crumbs('Indicadores')}
-  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><h1 style="margin:0">Indicadores</h1>
-    <nav class="seg" aria-label="Período">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['365', '1 ano']].map(([v, t]) => `<a href="#/indicadores?d=${v}" class="${v === dias ? 'on' : ''}">${t}</a>`).join('')}</nav></div>
-  <div class="kpis">
-    ${kpi(tot, 'Clientes atendidos', `desde ${dataBR(k.desde)}`)}
-    ${kpi(marc, 'Consultas marcadas', `${pct(marc, tot)}% dos clientes`)}
-    ${kpi(pct(marc, tot) + '%', 'Taxa de agendamento', 'clientes que marcaram')}
-    ${kpi(k.proximas, 'Próximas consultas', 'de hoje em diante')}
-    ${kpi(k.andamento, 'Em andamento', 'esperando clínica ou cliente')}
-    ${kpi(k.com_equipe, 'Passados para a equipe', `${pct(k.com_equipe, tot)}% dos clientes`)}
-    ${kpi(k.sem_vaga, 'Clínica sem vaga', `${pct(k.sem_vaga, tot)}% dos clientes`)}
-    ${kpi(k.realizadas, 'Exames realizados', marc ? `${pct(k.realizadas, marc)}% das marcadas` : '')}
-  </div>
-  <div class="grid2">
-    <section class="panel"><h2>Situação dos clientes</h2>${rosca}</section>
-    <section class="panel"><h2>Novos clientes por dia</h2>${colunas}</section>
-    <section class="panel"><h2>De onde vieram</h2>${barras(k.por_origem)}
-      <p class="hint">O WhatsApp não informa se a pessoa usou celular ou computador, nem de qual página veio. Para separar site, Instagram e anúncios, cada canal precisa de um link de WhatsApp com uma frase própria. A Íris reconhece a frase e grava a origem aqui.</p></section>
-    <section class="panel"><h2>Mensagens no período</h2>${barras(k.msgs_por_origem, o => ORIGEM[o] || o)}
-      ${k.msgs_total ? '' : '<p class="hint">Começa a contar quando a gravação das conversas estiver ligada.</p>'}</section>
-    <section class="panel"><h2>Horário em que os clientes mais escrevem</h2>${pico}</section>
-    <section class="panel"><h2>Dia da semana das consultas</h2>${barras(Object.fromEntries(Object.entries(k.consultas_por_dia_semana || {}).sort((x, y) => x[0] - y[0]).map(([w, v]) => [SEM[w] || w, v])), null, true)}</section>
-  </div>
-  <p class="hint" style="margin-top:12px">Total de clientes desde o início: <b>${k.clientes_total}</b>. Só números aparecem aqui: nenhum nome, telefone ou CPF.</p>`;
+  <div class="dash">
+    <aside class="d-side">
+      <h1>Indicadores dos atendimentos</h1>
+      <p class="d-sub">Exame de vista · Íris</p>
+      <div class="d-filtro"><b>Período</b>
+        ${[['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['365', 'Último ano']].map(([v, t]) => `<a href="#/indicadores?d=${v}" class="${v === dias ? 'on' : ''}" aria-current="${v === dias}">${t}</a>`).join('')}
+      </div>
+      <dl class="d-mini">
+        <dt>Em andamento</dt><dd>${nf(k.andamento)}</dd>
+        <dt>Com a equipe</dt><dd>${nf(k.com_equipe)}</dd>
+        <dt>Clínica sem vaga</dt><dd>${nf(k.sem_vaga)}</dd>
+        <dt>Canceladas</dt><dd>${nf(k.canceladas)}</dd>
+        <dt>Desde o início</dt><dd>${nf(k.clientes_total)}</dd>
+      </dl>
+      <p class="d-sub">Desde ${dataBR(k.desde)} · atualizado às ${agora}</p>
+    </aside>
+    <div class="d-main">
+      <div class="d-kpis">
+        ${kpi('pessoas', nf(tot), 'Clientes atendidos', '', DC.azul)}
+        ${kpi('agenda', nf(marc), 'Consultas marcadas', '', DC.laranja)}
+        ${kpi('taxa', pct(marc, tot) + '%', 'Taxa de agendamento', 'clientes que marcaram', DC.amarelo)}
+        ${kpi('olho', nf(k.realizadas), 'Exames realizados', marc ? pct(k.realizadas, marc) + '% das marcadas' : '', DC.verde)}
+        ${kpi('relogio', nf(k.proximas), 'Próximas consultas', 'de hoje em diante', DC.roxo)}
+      </div>
+      <div class="d-grid">
+        <section class="d-card d-w2"><h2>Clientes ao longo do tempo</h2>${dLinha(serieTempo(k.por_dia, Number(dias)))}</section>
+        <section class="d-card"><h2>Situação dos clientes</h2>${rosca(grupos, tot, 'clientes')}</section>
+        <section class="d-card"><h2>Do contato ao exame</h2>${dBarras(funil)}
+          <p class="d-nota">${pct(marc, tot)}% marcaram consulta${marc ? ` e ${pct(k.realizadas, marc)}% delas já foram realizadas` : ''}.</p></section>
+        <section class="d-card"><h2>Mensagens por origem</h2>${k.msgs_total ? rosca(msgs, k.msgs_total, 'mensagens') : '<p class="d-vazio">Começa a contar quando a gravação das conversas estiver ligada.</p>'}</section>
+        <section class="d-card"><h2>De onde vieram</h2>${dBarras(origem)}
+          <p class="d-nota">Para separar site, Instagram e anúncios, cada canal precisa de um link de WhatsApp com uma frase própria.</p></section>
+        <section class="d-card"><h2>Dia da semana das consultas</h2>${dBarras(semana, DC.laranja)}</section>
+        <section class="d-card d-w2"><h2>Horário em que os clientes mais escrevem</h2>${k.msgs_total ? dColunas(horas) : '<p class="d-vazio">Começa a contar quando a gravação das conversas estiver ligada.</p>'}</section>
+      </div>
+      <p class="d-nota" style="margin-top:10px">Só números aparecem aqui: nenhum nome, telefone ou CPF.</p>
+    </div>
+  </div>`;
+}
+function dColunas(lista) {
+  const mx = Math.max(1, ...lista.map(x => x[1]));
+  return `<div class="d-cols">${lista.map(([t, n]) => `<div><b>${n || ''}</b><i style="height:${n ? Math.max(4, (n / mx) * 100) : 2}%"></i><span>${t}</span></div>`).join('')}</div>`;
 }
 
 /* ---------------- Eventos da página ---------------- */
