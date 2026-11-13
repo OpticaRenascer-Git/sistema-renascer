@@ -153,6 +153,61 @@ header.top .brand small{font-weight:600;color:var(--muted);font-size:14px}
 .seg a{padding:7px 12px;text-decoration:none;color:var(--fg);font-weight:700;font-size:13.5px}
 .seg a.on{background:var(--brand);color:var(--on-brand)}
 .acoes{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Indicadores: painel escuro no estilo dashboard, igual nos temas claro e escuro */
+.dash{--d-bg:#10161D;--d-card:#18212B;--d-line:#2A3542;--d-fg:#EEF2F6;--d-muted:#9DABB9;background:var(--d-bg);color:var(--d-fg);border-radius:18px;padding:14px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:14px}
+@media (max-width:900px){.dash{grid-template-columns:minmax(0,1fr);padding:10px}}
+.d-side{background:var(--d-card);border:1px solid var(--d-line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.d-side h1{font-size:21px;line-height:1.2;margin:0;color:var(--d-fg)}
+.d-sub{color:var(--d-muted);font-size:12.5px;margin:0}
+.d-filtro{display:flex;flex-direction:column;gap:6px}
+.d-filtro b{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--d-muted)}
+.d-filtro a{color:var(--d-fg);text-decoration:none;border:1px solid var(--d-line);border-radius:9px;padding:8px 10px;font-weight:700;font-size:13.5px}
+.d-filtro a:hover{border-color:#F58220}
+.d-filtro a.on{background:#F58220;border-color:#F58220;color:#1B1006}
+@media (max-width:900px){.d-filtro{flex-direction:row;flex-wrap:wrap}.d-filtro b{width:100%}.d-filtro a{flex:1 1 40%;text-align:center}}
+.d-mini{display:grid;grid-template-columns:1fr auto;gap:6px 10px;margin:0;font-size:13.5px}
+.d-mini dt{color:var(--d-muted)} .d-mini dd{margin:0;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.d-main{min-width:0}
+.d-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media (max-width:1150px){.d-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.d-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.d-kpi{background:var(--d-card);border:1px solid var(--d-line);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;min-width:0}
+.d-kpi .d-ic{flex:none;width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.06);display:grid;place-items:center}
+.d-kpi svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8}
+.d-kpi small{display:block;color:var(--d-muted);font-size:12.5px;font-weight:700}
+.d-kpi b{display:block;font-family:var(--f-display);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.d-kpi em{display:block;font-style:normal;color:var(--d-muted);font-size:11.5px}
+.d-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+@media (max-width:1150px){.d-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.d-grid{grid-template-columns:minmax(0,1fr)}.d-w2{grid-column:auto!important}}
+.d-w2{grid-column:span 2}
+.d-card{background:var(--d-card);border:1px solid var(--d-line);border-radius:14px;padding:14px 16px;min-width:0}
+.d-card h2{font-size:15px;margin:0 0 10px;color:var(--d-fg);text-align:center}
+.d-linha{width:100%;height:auto;display:block}
+.d-linha .d-val{fill:var(--d-fg);font-size:12px;font-weight:700}
+.d-linha .d-eixo{fill:var(--d-muted);font-size:11.5px}
+.d-linha .d-media{fill:#FFC20E;font-size:11.5px;font-weight:700}
+.d-rosca{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}
+.d-rosca svg{width:150px;height:150px;flex:none}
+.d-rosca .d-big{fill:var(--d-fg);font-size:26px;font-weight:800;font-family:var(--f-display)}
+.d-rosca .d-small{fill:var(--d-muted);font-size:11px;font-weight:700}
+.d-rosca ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:150px;flex:1}
+.d-rosca li{display:grid;grid-template-columns:10px 1fr auto auto;gap:8px;align-items:center}
+.d-rosca li i{width:10px;height:10px;border-radius:3px}
+.d-rosca li b{font-variant-numeric:tabular-nums} .d-rosca li em{font-style:normal;color:var(--d-muted);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+.d-hbar{display:grid;grid-template-columns:minmax(80px,auto) minmax(0,1fr);gap:8px 10px;align-items:center;font-size:13px}
+.d-hbar > div{height:24px}
+.d-hbar i{font-style:normal;display:flex;align-items:center;justify-content:flex-end;height:100%;border-radius:5px;min-width:30px;padding:0 7px;box-sizing:border-box}
+.d-hbar i b{color:#0E141A;font-size:12.5px;font-variant-numeric:tabular-nums}
+.d-cols{display:flex;align-items:flex-end;gap:6px;height:170px;border-bottom:1px solid var(--d-line);padding-top:6px}
+.d-cols div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.d-cols i{font-style:normal;width:100%;background:#F58220;border-radius:5px 5px 0 0}
+.d-cols b{font-size:11.5px;margin-bottom:3px;font-variant-numeric:tabular-nums}
+.d-cols span{font-size:11px;color:var(--d-muted);margin-top:4px;position:relative;top:18px;height:0}
+.d-cols{margin-bottom:20px}
+.d-nota{color:var(--d-muted);font-size:12px;margin:10px 0 0}
+.d-vazio{color:var(--d-muted);font-size:13px;text-align:center;padding:20px 0}
 </style>
 </head><body>
 <div class="wrap">
