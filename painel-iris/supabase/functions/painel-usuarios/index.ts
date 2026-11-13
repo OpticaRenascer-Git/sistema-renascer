@@ -3,23 +3,23 @@
 // Ações: listar, convidar, mudar_papel, bloquear, zerar_codigo (celular perdido).
 // O perfil fica em app_metadata.papel, que só o servidor consegue alterar.
 // Variáveis: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (automáticas no Supabase)
-//            PAINEL_ORIGEM (endereço do site do painel, ex.: https://usuario.github.io)
-//            PAINEL_REDIRECT (página para onde o convite leva, ex.: https://usuario.github.io/sistema-renascer/painel-iris/)
+//            PAINEL_ORIGENS (endereços do painel separados por vírgula, opcional)
+//            PAINEL_REDIRECT (página para onde o convite leva)
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const ORIGEM = Deno.env.get('PAINEL_ORIGEM') ?? 'https://opticarenascer-git.github.io';
-const REDIRECT = Deno.env.get('PAINEL_REDIRECT') ?? 'https://opticarenascer-git.github.io/sistema-renascer/painel-iris/';
+const ORIGENS = (Deno.env.get('PAINEL_ORIGENS') ??
+  'https://www.opticarenascergoexame.com.br,https://opticarenascergoexame.com.br,https://painel-exame-de-vista.vercel.app')
+  .split(',').map((x) => x.trim()).filter(Boolean);
+const REDIRECT = Deno.env.get('PAINEL_REDIRECT') ?? 'https://painel-exame-de-vista.vercel.app/';
 const PAPEIS = ['administrador', 'visualizador'];
 
-const cors = (req: Request) => {
-  const o = req.headers.get('origin') ?? '';
-  return {
-    'Access-Control-Allow-Origin': ORIGEM && o === ORIGEM ? o : ORIGEM || 'null',
-    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Vary': 'Origin',
-  };
-};
+const permitida = (req: Request) => ORIGENS.includes(req.headers.get('origin') ?? '');
+const cors = (req: Request) => ({
+  'Access-Control-Allow-Origin': permitida(req) ? req.headers.get('origin')! : ORIGENS[0],
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Vary': 'Origin',
+});
 const json = (req: Request, body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json' } });
 
@@ -30,7 +30,7 @@ const claims = (jwt: string) => {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
   if (req.method !== 'POST') return json(req, { erro: 'método não permitido' }, 405);
-  if (ORIGEM && req.headers.get('origin') !== ORIGEM) return json(req, { erro: 'origem não permitida' }, 403);
+  if (!permitida(req)) return json(req, { erro: 'origem não permitida' }, 403);
 
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
   if (!token) return json(req, { erro: 'sem login' }, 401);
