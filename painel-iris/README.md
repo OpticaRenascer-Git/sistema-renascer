@@ -22,6 +22,7 @@ Fica separado do Sistema Renascer: usa o **Supabase da Íris** e tem login próp
 |---|---|
 | `sql/00_fechar_memory.sql` | Fecha a tabela `memory` (conversas) para a chave pública. Hoje ela está aberta |
 | `sql/01_fase1_registro.sql` | Cria `atendimentos`, `atendimento_mensagens`, `atendimento_eventos` e as funções do painel e do n8n |
+| `sql/03_gravacao.sql` | `painel_log` (os fluxos gravam cada mensagem), gatilho de eventos de status e corte da conversa anterior |
 | `sql/02_indicadores.sql` | Função `painel_indicadores` (só números agregados, sem dado pessoal) |
 | `supabase/functions/painel-usuarios` | Função do servidor para o administrador convidar, mudar perfil e bloquear usuários |
 
@@ -30,4 +31,4 @@ Fica separado do Sistema Renascer: usa o **Supabase da Íris** e tem login próp
 2. Publicar a função `painel-usuarios` com `PAINEL_ORIGEM` e `PAINEL_REDIRECT` apontando para o endereço do painel.
 3. No Supabase (Authentication): desligar o cadastro aberto (só convite), ligar MFA TOTP e colocar o endereço do painel em Redirect URLs.
 4. Convidar o proprietário e dar a ele o perfil `administrador` (uma vez, pelo SQL).
-5. Ligar a gravação nos fluxos do n8n (`painel_registrar_mensagem` e `painel_registrar_evento`), com backup antes.
+5. Gravação ligada em 13/11/2026: nós "Painel ·" nos fluxos da Íris e da clínica chamam `painel_log` (erros não param o fluxo).

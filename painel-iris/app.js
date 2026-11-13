@@ -35,7 +35,7 @@ const statusChip = (s, transferido) => {
 };
 const ORIGEM = { cliente: 'Cliente', iris: 'Íris', clinica: 'Clínica', equipe: 'Equipe da loja', sistema: 'Sistema' };
 const EVENTO = {
-  status: 'Status mudou', transferido: 'Passado para a equipe', confirmacao_enviada: 'Confirmação enviada',
+  status: 'Status mudou', transferido: 'Passado para a equipe', devolvido_iris: 'Voltou para a Íris', confirmacao_enviada: 'Confirmação enviada',
   beneficio_enviado: 'Benefício enviado', lembrete_enviado: 'Lembrete enviado', cpf_visto: 'CPF completo visto',
   usuario_convidado: 'Usuário convidado', usuario_perfil: 'Perfil de usuário alterado',
   usuario_bloqueado: 'Usuário bloqueado', usuario_liberado: 'Usuário liberado',
