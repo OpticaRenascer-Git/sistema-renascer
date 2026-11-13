@@ -7,8 +7,8 @@
 //            PAINEL_REDIRECT (página para onde o convite leva, ex.: https://usuario.github.io/sistema-renascer/painel-iris/)
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const ORIGEM = Deno.env.get('PAINEL_ORIGEM') ?? '';
-const REDIRECT = Deno.env.get('PAINEL_REDIRECT') ?? undefined;
+const ORIGEM = Deno.env.get('PAINEL_ORIGEM') ?? 'https://opticarenascergo-cpuloja.github.io';
+const REDIRECT = Deno.env.get('PAINEL_REDIRECT') ?? 'https://opticarenascergo-cpuloja.github.io/sistema-renascer/painel-iris/';
 const PAPEIS = ['administrador', 'visualizador'];
 
 const cors = (req: Request) => {
