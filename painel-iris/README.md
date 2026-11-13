@@ -4,7 +4,7 @@ Histórico e auditoria dos atendimentos da Íris (agente de WhatsApp da Óptica 
 Fica separado do Sistema Renascer: usa o **Supabase da Íris** e tem login próprio.
 
 - Página: `index.html` e `app.js`, sem etapa de build (como o Sistema Renascer).
-- Publicação: GitHub Pages, no endereço `/painel-iris/` do site do repositório.
+- Publicação: Vercel (projeto `painel-exame-de-vista`, pasta `painel-iris`), com os cabeçalhos de segurança do `vercel.json`. Endereço: https://painel-exame-de-vista.vercel.app (domínio próprio: www.opticarenascergoexame.com.br). O endereço antigo no GitHub Pages só redireciona para o novo.
 - A chave em `app.js` é a pública (publishable). Ela sozinha não abre dado nenhum.
 
 ## Segurança
@@ -24,6 +24,7 @@ Fica separado do Sistema Renascer: usa o **Supabase da Íris** e tem login próp
 | `sql/01_fase1_registro.sql` | Cria `atendimentos`, `atendimento_mensagens`, `atendimento_eventos` e as funções do painel e do n8n |
 | `sql/03_gravacao.sql` | `painel_log` (os fluxos gravam cada mensagem), gatilho de eventos de status e corte da conversa anterior |
 | `sql/02_indicadores.sql` | Função `painel_indicadores` (só números agregados, sem dado pessoal) |
+| `sql/04_tipos_mensagem.sql` | Aceita os tipos de mensagem "para a clínica", "aviso à loja", "lembrete" e "lembrete não enviado" |
 | `supabase/functions/painel-usuarios` | Função do servidor para o administrador convidar, mudar perfil e bloquear usuários |
 
 ## Para colocar no ar (com aprovação do proprietário)
