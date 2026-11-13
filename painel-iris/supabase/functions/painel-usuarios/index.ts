@@ -1,6 +1,6 @@
 // Painel da Íris · Edge Function "painel-usuarios"
 // Só um ADMINISTRADOR com login em 2 etapas (aal2) pode usar.
-// Ações: listar, convidar, mudar_papel, bloquear.
+// Ações: listar, convidar, mudar_papel, bloquear, zerar_codigo (celular perdido).
 // O perfil fica em app_metadata.papel, que só o servidor consegue alterar.
 // Variáveis: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (automáticas no Supabase)
 //            PAINEL_ORIGEM (endereço do site do painel, ex.: https://usuario.github.io)
@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
       papel: (x.app_metadata?.papel as string) ?? null,
       bloqueado: !!x.banned_until && new Date(x.banned_until) > new Date(),
       ultimo_acesso: x.last_sign_in_at, convidado_em: x.invited_at, confirmado: !!x.email_confirmed_at,
+      tem_codigo: (x.factors ?? []).some((f) => f.status === 'verified'),
     }));
     return json(req, { usuarios: lista });
   }
@@ -101,6 +102,19 @@ Deno.serve(async (req) => {
     const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: bloquear ? '876000h' : 'none' });
     if (error) return json(req, { erro: error.message }, 500);
     await registrar(bloquear ? 'usuario_bloqueado' : 'usuario_liberado', String(alvo.user.email));
+    return json(req, { ok: true });
+  }
+
+  if (acao === 'zerar_codigo') {
+    // Celular perdido ou trocado: apaga o código de verificação da pessoa.
+    // No próximo acesso o painel pede para ela cadastrar o código de novo.
+    const { data: f, error: ef } = await admin.auth.admin.mfa.listFactors({ userId: id });
+    if (ef) return json(req, { erro: ef.message }, 500);
+    for (const fator of f?.factors ?? []) {
+      const { error } = await admin.auth.admin.mfa.deleteFactor({ userId: id, id: fator.id });
+      if (error) return json(req, { erro: error.message }, 500);
+    }
+    await registrar('usuario_codigo_zerado', String(alvo.user.email));
     return json(req, { ok: true });
   }
 

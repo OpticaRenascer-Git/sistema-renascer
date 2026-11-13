@@ -1,4 +1,4 @@
-// Painel da Íris · histórico e auditoria dos atendimentos (Óptica Renascer)
+// Painel Exame de Vista (Íris) · histórico e auditoria dos atendimentos (Óptica Renascer)
 // Banco: Supabase da Íris. A chave abaixo é a chave PÚBLICA (publishable): ela sozinha não abre dado nenhum.
 // Quem protege os dados: login com código de verificação (2 etapas) + funções do banco que conferem o perfil.
 const SUPABASE_URL = 'https://sxjtelptvwtbytythycc.supabase.co';
@@ -38,10 +38,16 @@ const EVENTO = {
   status: 'Status mudou', transferido: 'Passado para a equipe', confirmacao_enviada: 'Confirmação enviada',
   beneficio_enviado: 'Benefício enviado', lembrete_enviado: 'Lembrete enviado', cpf_visto: 'CPF completo visto',
   usuario_convidado: 'Usuário convidado', usuario_perfil: 'Perfil de usuário alterado',
-  usuario_bloqueado: 'Usuário bloqueado', usuario_liberado: 'Usuário liberado'
+  usuario_bloqueado: 'Usuário bloqueado', usuario_liberado: 'Usuário liberado',
+  usuario_codigo_zerado: 'Código do celular zerado'
 };
 
-const S = { criarSenha: VEIO_DE_LINK, session: null, papel: null, nome: '', mfa: null, erro: '', ok: '', cache: {} };
+// Dados da clínica: os mesmos da mensagem de confirmação que a Íris envia ao cliente.
+const CLINICA = { nome: 'Clínica Saúde', endereco: 'Praça do Santuário, nº 356, ao lado do Banco Itaú, Centro, Trindade-GO', valor: 'R$ 100,00, pagos diretamente na clínica no momento da consulta' };
+const fSemana = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'long' });
+const diaSemana = iso => { if (!iso) return ''; const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z'); return fSemana.format(d); };
+
+const S = { tela: '', esperaAte: 0, criarSenha: VEIO_DE_LINK, session: null, papel: null, nome: '', mfa: null, erro: '', ok: '', cache: {} };
 const isAdm = () => S.papel === 'administrador';
 
 /* ---------------- Sessão, login e código de verificação ---------------- */
@@ -88,10 +94,14 @@ async function entrar() {
   if (error) { S.erro = 'E-mail ou senha não conferem.'; rota(); }
 }
 async function esqueci() {
-  const email = $('l-email').value.trim();
-  if (!email) { S.erro = 'Digite o seu e-mail para receber o link.'; return rota(); }
+  const email = ($('r-email').value || '').trim().toLowerCase();
+  S.ok = '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { S.erro = 'Digite o seu e-mail completo.'; return rota(); }
+  if (Date.now() < S.esperaAte) { S.erro = 'Aguarde um minuto antes de pedir outro link.'; return rota(); }
+  S.esperaAte = Date.now() + 60000;
   await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
-  S.erro = ''; S.ok = 'Se o e-mail estiver cadastrado, chega um link para criar uma nova senha.'; rota();
+  // A resposta é sempre a mesma: não revela se o e-mail tem cadastro.
+  S.erro = ''; S.ok = 'Pronto. Se este e-mail tiver acesso ao painel, chega em alguns minutos um link para criar uma nova senha. Olhe também no spam.'; rota();
 }
 async function cadastrarCodigo() {
   const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Painel da Íris' });
@@ -111,17 +121,22 @@ async function novaSenha() {
   const s1 = $('p-senha').value, s2 = $('p-senha2').value;
   if (s1.length < 10) { S.erro = 'Use pelo menos 10 caracteres.'; return rota(); }
   if (s1 !== s2) { S.erro = 'As duas senhas não são iguais.'; return rota(); }
+  if (!/[A-Za-z]/.test(s1) || !/\d/.test(s1)) { S.erro = 'Use letras e números na senha.'; return rota(); }
   const { error } = await sb.auth.updateUser({ password: s1 });
-  if (error) { S.erro = error.message; return rota(); }
-  S.criarSenha = false; S.erro = ''; S.ok = 'Senha criada.'; location.hash = '#/'; rota();
+  if (error) { S.erro = /same|different/i.test(error.message) ? 'A nova senha precisa ser diferente da anterior.' : error.message; return rota(); }
+  await sb.auth.signOut({ scope: 'others' }); // encerra o acesso em outros aparelhos
+  const eraConta = !S.criarSenha;
+  S.criarSenha = false; S.erro = ''; S.ok = 'Senha salva. Se havia acesso aberto em outro aparelho, ele foi encerrado.';
+  if (eraConta) return pConta();
+  location.hash = '#/'; rota();
 }
 
 /* ---------------- Rotas ---------------- */
 function rota() {
   const who = $('who'), main = $('main');
   const precisaSenha = S.criarSenha;
-  if (!S.session) { who.innerHTML = ''; main.innerHTML = vLogin(); return; }
-  who.innerHTML = `<span>${esc(S.nome)}${S.papel ? ` · ${isAdm() ? 'Administrador' : 'Visualizador'}` : ''}</span><button class="btn small" data-act="sair">Sair</button>`;
+  if (!S.session) { who.innerHTML = ''; main.innerHTML = S.tela === 'esqueci' ? vEsqueci() : vLogin(); return; }
+  who.innerHTML = `<a class="btn small" href="#/conta" title="Minha conta e senha">${esc(S.nome)}${S.papel ? ` · ${isAdm() ? 'Administrador' : 'Visualizador'}` : ''}</a><button class="btn small" data-act="sair">Sair</button>`;
   if (S.mfa) { main.innerHTML = vMfa(); return; }
   if (precisaSenha) { main.innerHTML = vSenha(); return; }
   if (!S.papel) { main.innerHTML = `<div class="login"><div class="panel"><h2>Sem acesso</h2><p class="hint">O seu usuário ainda não tem perfil no painel. Peça ao administrador.</p></div></div>`; return; }
@@ -132,9 +147,14 @@ function rota() {
   if (pag === 'atendimento' && arg) return pAtendimento(decodeURIComponent(arg));
   if (pag === 'usuarios' && isAdm()) return pUsuarios();
   if (pag === 'auditoria' && isAdm()) return pAuditoria();
+  if (pag === 'indicadores') return pIndicadores(q.get('d') || '30');
+  if (pag === 'conta') return pConta();
   location.hash = '#/';
 }
-const crumbs = (...partes) => `<nav class="crumbs" aria-label="Caminho"><a href="#/">Início</a>${partes.map(p => ` › ${p}`).join('')}</nav>`;
+// Barra fixa em todas as páginas: Voltar (página anterior) e Início, mais o caminho.
+const crumbs = (...partes) => `<div class="navbar"><button class="btn small" data-act="voltar" aria-label="Voltar para a página anterior">← Voltar</button>
+  <a class="btn small" href="#/" aria-label="Ir para o início">Início</a>
+  <nav class="crumbs" aria-label="Caminho"><a href="#/">Início</a>${partes.map(p => ` › ${p}`).join('')}</nav></div>`;
 const avisos = () => (S.erro ? `<div class="msg bad" role="alert">${esc(S.erro)}</div>` : '') + (S.ok ? `<div class="msg ok" role="status">${esc(S.ok)}</div>` : '');
 const falha = e => { S.erro = /sem acesso|só administrador/.test(e?.message || '') ? 'Você não tem acesso a esta parte.' : 'Não consegui carregar: ' + (e?.message || 'erro'); };
 
@@ -143,7 +163,16 @@ function vLogin() {
     <label>E-mail<input id="l-email" type="email" autocomplete="username" inputmode="email"></label>
     <label>Senha<input id="l-senha" type="password" autocomplete="current-password"></label>
     <button class="btn primary" data-act="entrar">Entrar</button>
-    <button class="btn small" data-act="esqueci">Esqueci a senha</button></div></div>`;
+    <button class="btn small" data-act="tela-esqueci">Esqueci a senha</button></div></div>`;
+}
+function vEsqueci() {
+  return `<div class="login"><div class="panel"><h2>Esqueci a senha</h2>${avisos()}
+    <p class="hint">Digite o e-mail que você usa no painel. Vamos mandar um link para criar uma senha nova.</p>
+    <p class="hint">Por segurança, depois de abrir o link o painel pede também o código de 6 números do aplicativo no seu celular. Sem o código, a senha não pode ser trocada.</p>
+    <label>E-mail<input id="r-email" type="email" autocomplete="username" inputmode="email"></label>
+    <button class="btn primary" data-act="esqueci">Enviar link</button>
+    <button class="btn small" data-act="tela-login">← Voltar para entrar</button>
+    <p class="hint">Perdeu ou trocou de celular? Peça a um administrador para zerar o seu código na página Usuários.</p></div></div>`;
 }
 function vMfa() {
   const m = S.mfa;
@@ -157,15 +186,24 @@ function vMfa() {
     <label>Código de 6 números<input id="m-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
     <button class="btn primary" data-act="mfa-confirmar">Confirmar</button></div></div>`;
   return `<div class="login"><div class="panel"><h2>Código de verificação</h2>${avisos()}
-    <p class="hint">Abra o aplicativo de autenticação e digite os 6 números do Painel da Íris.</p>
+    <p class="hint">${S.criarSenha ? 'Para criar a nova senha, primeiro confirme que é você: abra' : 'Abra'} o aplicativo de autenticação e digite os 6 números do painel.</p>
     <label>Código de 6 números<input id="m-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
     <button class="btn primary" data-act="mfa-confirmar">Entrar</button></div></div>`;
 }
+const formSenha = () => `<p class="hint">Mínimo 10 caracteres, com letras e números. Não use a mesma senha de outros sites.</p>
+    <label>Nova senha<input id="p-senha" type="password" autocomplete="new-password"></label>
+    <label>Repita a nova senha<input id="p-senha2" type="password" autocomplete="new-password"></label>
+    <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" data-act="ver-senha" style="width:auto"> Mostrar a senha</label>
+    <button class="btn primary" data-act="nova-senha">Salvar senha</button>`;
 function vSenha() {
-  return `<div class="login"><div class="panel"><h2>Criar a sua senha</h2>${avisos()}
-    <label>Nova senha (mínimo 10 caracteres)<input id="p-senha" type="password" autocomplete="new-password"></label>
-    <label>Repita a senha<input id="p-senha2" type="password" autocomplete="new-password"></label>
-    <button class="btn primary" data-act="nova-senha">Salvar senha</button></div></div>`;
+  return `<div class="login"><div class="panel"><h2>Criar nova senha</h2>${avisos()}${formSenha()}</div></div>`;
+}
+function pConta() {
+  const u = S.session.user;
+  $('main').innerHTML = `${crumbs('Minha conta')}${avisos()}<div class="login" style="margin-top:0"><div class="panel"><h2>Minha conta</h2>
+    <dl class="kv"><dt>Nome</dt><dd>${esc(u.user_metadata?.nome || '')}</dd><dt>E-mail</dt><dd>${esc(u.email)}</dd><dt>Perfil</dt><dd>${isAdm() ? 'Administrador' : 'Visualizador'}</dd></dl>
+    <h3>Trocar a senha</h3>${formSenha()}</div></div>`;
+  S.erro = ''; S.ok = '';
 }
 
 /* ---------------- Início: botões ---------------- */
@@ -192,7 +230,7 @@ async function pInicio() {
     ${card('#/atendimentos?f=equipe', 'chat', 'Com a equipe', 'Passados da Íris para a loja', eq)}
     ${isAdm() ? card('#/usuarios', 'pessoas', 'Usuários', 'Cadastrar, mudar perfil e bloquear') : ''}
     ${isAdm() ? card('#/auditoria', 'escudo', 'Auditoria', 'Quem fez o quê no painel') : ''}
-    ${card('#/', 'grafico', 'Indicadores', 'Em breve', '', true)}
+    ${card('#/indicadores', 'grafico', 'Indicadores', 'Gráficos de atendimentos, consultas e origem dos clientes')}
   </div>`;
   S.erro = ''; S.ok = '';
 }
@@ -236,9 +274,29 @@ async function pAtendimento(id) {
   S.cache.ficha = fi;
   main.innerHTML = `${crumbs('<a href="#/atendimentos">Atendimentos</a>', esc(fi.nome || 'Atendimento'))}
   <div class="split"><section class="panel" aria-label="Conversa"><div class="head" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Conversa</h2>
-    <div class="legend">${Object.entries(ORIGEM).map(([k, t]) => `<span><i style="background:var(--c-${k})"></i>${t}</span>`).join('')}</div></div>
+    <div class="legend" id="legenda"></div></div>
+    <p class="hint" style="margin:0">Toque num nome acima para ir até as mensagens dele. Cada toque leva para a próxima.</p>
     ${vLinha(m.data, e.data, fi)}</section>
   <aside class="ficha panel" aria-label="Ficha">${vFicha(fi)}</aside></div>`;
+  S.pulo = {};
+  const leg = $('legenda');
+  leg.innerHTML = Object.entries(ORIGEM).map(([k, t]) => {
+    const n = document.querySelectorAll(`.timeline .bub.${k}`).length;
+    return `<button data-act="pular" data-o="${k}"${n ? '' : ' disabled'} aria-label="Ir para as mensagens de ${t} (${n})"><i style="background:var(--c-${k});border:1px solid var(--line)"></i>${t}<em>${n}</em></button>`;
+  }).join('');
+}
+// Vai até a próxima mensagem daquela origem (cliente, Íris, clínica, equipe ou sistema).
+function pular(o) {
+  const lista = [...document.querySelectorAll(`.timeline .bub.${o}`)];
+  if (!lista.length) return;
+  const i = ((S.pulo[o] ?? -1) + 1) % lista.length; S.pulo[o] = i;
+  const el = lista[i];
+  const det = el.closest('details'); if (det) det.open = true;
+  document.querySelectorAll('.bub.flash').forEach(x => x.classList.remove('flash'));
+  el.classList.add('flash');
+  el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  const b = document.querySelector(`[data-act="pular"][data-o="${o}"] em`); if (b) b.textContent = `${i + 1} de ${lista.length}`;
+  setTimeout(() => el.classList.remove('flash'), 2500);
 }
 function vLinha(msgs, eventos, fi) {
   const ant = msgs.filter(x => x.fonte === 'anterior');
@@ -274,24 +332,44 @@ function vFicha(fi) {
   const linha = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
   const outras = (fi.pessoas || []).filter(p => p.pessoa_id !== fi.pessoa_id);
   return `<h2>${esc(fi.nome || 'Sem nome')}</h2><div>${statusChip(fi.status_agendamento, fi.transferido)}</div>
+  ${vAgenda(fi)}
+  <h3>Dados do cliente</h3>
   <dl class="kv">
     ${linha('WhatsApp', `<span class="nw">${fone(fi.telefone)}</span>`)}
     ${linha('Nome no WhatsApp', esc(fi.nome_whatsapp))}
     ${fi.tem_cpf ? `<dt>CPF</dt><dd><span class="mono" id="cpf">${esc(fi.cpf)}</span>${isAdm() ? ' <button class="btn small" data-act="ver-cpf">Mostrar</button>' : ''}</dd>` : '<dt>CPF</dt><dd class="hint">não informado</dd>'}
     ${linha('Nascimento', esc(dataBR(fi.data_nascimento)))}
     ${linha('E-mail', esc(fi.email))}
-    ${linha('Consulta', fi.data_exame ? esc(dataBR(fi.data_exame) + (fi.horario_exame ? ' às ' + horaBR(fi.horario_exame) : '')) : '')}
-    ${linha('Clínica', esc(fi.clinica))}
-    ${linha('Protocolo', esc(fi.protocolo))}
     ${linha('Autorizou envio', fi.autorizou_compartilhamento == null ? '' : fi.autorizou_compartilhamento ? 'Sim' : 'Não')}
-    ${linha('Confirmada em', esc(quando(fi.confirmada_em)))}
-    ${linha('Realizada em', esc(quando(fi.realizada_em)))}
     ${linha('Primeiro contato', esc(quando(fi.criado_em)))}
     ${linha('Última mudança', esc(quando(fi.atualizado_em)))}
   </dl>
   ${outras.length ? `<div><h3>Mesmo WhatsApp</h3><div class="rows">${outras.map(p => `<a class="rowlink" style="grid-template-columns:1fr" href="#/atendimento/${encodeURIComponent(p.pessoa_id)}"><b>${esc(p.nome || 'Sem nome')}</b></a>`).join('')}</div></div>` : ''}
   ${(fi.atendimentos || []).length ? `<div><h3>Atendimentos</h3><dl class="kv">${fi.atendimentos.map(a => `<dt>${esc(dataBR(a.aberto_em))}</dt><dd>${a.fechado_em ? esc(a.resultado || 'fechado') : '<span class="chip warn">aberto</span>'}</dd>`).join('')}</dl></div>` : ''}
-  <div><h3>Ações</h3><p class="hint">Responder, devolver para a Íris e reenviar a confirmação chegam na próxima etapa.</p></div>`;
+  <div><h3>Ações</h3><div class="acoes">
+    <button class="btn small" disabled>Responder</button><button class="btn small" disabled>Devolver para a Íris</button><button class="btn small" disabled>Reenviar confirmação</button></div>
+    <p class="hint">Estes botões passam a funcionar quando o painel for ligado ao WhatsApp da Íris (próxima etapa, com a sua aprovação).</p></div>`;
+}
+// Quadro do agendamento: as mesmas informações que o cliente recebe na confirmação.
+function vAgenda(fi) {
+  if (!fi.data_exame) {
+    return `<div class="agenda"><div class="topo-ag"><b>Agendamento</b></div><table><tr><td class="hint">Ainda sem consulta marcada.</td></tr></table></div>`;
+  }
+  const marcada = ['confirmado', 'consulta_marcada', 'marcado'].includes(fi.status_agendamento);
+  const linhas = [
+    ['Dia', `${esc(diaSemana(fi.data_exame))}, ${esc(dataBR(fi.data_exame))}`],
+    ['Horário', fi.horario_exame ? esc(horaBR(fi.horario_exame)) : '<span class="hint">a definir</span>'],
+    ['Local', esc(fi.clinica || CLINICA.nome)],
+    ['Endereço', esc(CLINICA.endereco)],
+    ['Valor', esc(CLINICA.valor)],
+    ['Protocolo', esc(fi.protocolo)],
+    ['Confirmada', esc(quando(fi.confirmada_em))],
+    ['Realizada', esc(quando(fi.realizada_em))]
+  ].filter(([, v]) => v);
+  const msg = `Sua consulta foi confirmada.\n🗓️ Data: ${diaSemana(fi.data_exame)}, ${dataBR(fi.data_exame).slice(0, 5)}\n🕐 Horário: ${fi.horario_exame ? String(fi.horario_exame).slice(0, 5) : 'a definir'}\n🏥 Local: ${fi.clinica || CLINICA.nome}\n📍 ${CLINICA.endereco}\n💰 Valor: ${CLINICA.valor}.`;
+  return `<div class="agenda"><div class="topo-ag"><b>Agendamento</b>${marcada ? '<span class="chip ok">Confirmado pela clínica</span>' : statusChip(fi.status_agendamento)}</div>
+    <table>${linhas.map(([k, v]) => `<tr><th scope="row">${k}</th><td>${v}</td></tr>`).join('')}</table>
+    ${marcada ? `<details style="padding:0 12px 10px"><summary class="hint" style="cursor:pointer">Ver a mensagem que o cliente recebeu</summary><div class="bub iris" style="margin-top:8px;max-width:100%"><p>${esc(msg)}</p></div></details>` : ''}</div>`;
 }
 async function verCpf() {
   const fi = S.cache.ficha; if (!fi) return;
@@ -326,7 +404,7 @@ async function pUsuarios() {
   ${lista.map(u => `<tr><td>${esc(u.nome)}</td><td>${esc(u.email)}${u.confirmado ? '' : ' <span class="chip warn">convite pendente</span>'}</td>
     <td>${u.id === meuId ? 'Administrador (você)' : `<select data-papel="${esc(u.id)}" aria-label="Perfil de ${esc(u.email)}"><option value="visualizador"${u.papel === 'visualizador' ? ' selected' : ''}>Visualizador</option><option value="administrador"${u.papel === 'administrador' ? ' selected' : ''}>Administrador</option>${u.papel ? '' : '<option selected disabled>Sem perfil</option>'}</select>`}</td>
     <td>${esc(quando(u.ultimo_acesso)) || '<span class="hint">nunca</span>'}</td>
-    <td>${u.id === meuId ? '' : `<button class="btn small" data-act="bloquear" data-id="${esc(u.id)}" data-b="${u.bloqueado ? '0' : '1'}">${u.bloqueado ? 'Liberar' : 'Bloquear'}</button>${u.bloqueado ? ' <span class="chip bad">bloqueado</span>' : ''}`}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum usuário.</td></tr>'}
+    <td>${u.id === meuId ? '' : `<button class="btn small" data-act="bloquear" data-id="${esc(u.id)}" data-b="${u.bloqueado ? '0' : '1'}">${u.bloqueado ? 'Liberar' : 'Bloquear'}</button>${u.tem_codigo ? ` <button class="btn small" data-act="zerar" data-id="${esc(u.id)}" title="Use quando a pessoa perder ou trocar de celular">Zerar código</button>` : ''}${u.bloqueado ? ' <span class="chip bad">bloqueado</span>' : ''}`}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum usuário.</td></tr>'}
   </tbody></table></div></div>`;
   S.erro = ''; S.ok = '';
 }
@@ -347,10 +425,83 @@ async function pAuditoria() {
   </tbody></table></div></div>`;
 }
 
+/* ---------------- Indicadores ---------------- */
+const GRUPO = { marcada: ['Consulta marcada', 'var(--ok)'], andamento: ['Em andamento', 'var(--sun)'], novo: ['Só conversou', 'var(--muted)'],
+  sem_vaga: ['Clínica sem vaga', 'var(--bad)'], cancelada: ['Cancelada', '#8A6FD1'], passada: ['Consulta já passou', 'var(--line)'] };
+const pct = (a, b) => b ? Math.round((a / b) * 100) : 0;
+async function pIndicadores(d) {
+  const main = $('main');
+  const dias = ['7', '30', '90', '365'].includes(d) ? d : '30';
+  main.innerHTML = `${crumbs('Indicadores')}<p class="spin">Carregando...</p>`;
+  const { data: k, error } = await sb.rpc('painel_indicadores', { p_dias: Number(dias) });
+  if (error) { falha(error); main.innerHTML = crumbs('Indicadores') + avisos(); S.erro = ''; return; }
+  const kpi = (n, t, sub) => `<div class="kpi"><span>${t}</span><b>${n}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const tot = k.clientes_periodo;
+  // Rosca: situação dos clientes do período
+  let acc = 0;
+  const fatias = Object.entries(GRUPO).map(([g, [t, c]]) => ({ g, t, c, n: k.por_grupo[g] || 0 })).filter(x => x.n);
+  const grad = fatias.map(x => { const a = acc; acc += (x.n / (tot || 1)) * 360; return `${x.c} ${a}deg ${acc}deg`; }).join(',') || 'var(--sunk) 0 360deg';
+  const rosca = `<div class="donut"><div class="ring" style="background:conic-gradient(${grad})"><div class="mid"><b>${tot}</b>clientes</div></div>
+    <div class="leg">${fatias.map(x => `<div><i style="background:${x.c}"></i>${x.t}: <b>${x.n}</b> (${pct(x.n, tot)}%)</div>`).join('') || '<span class="hint">Sem clientes no período.</span>'}</div></div>`;
+  // Barras horizontais
+  const barras = (obj, rot, ordem) => { const it = ordem ? Object.entries(obj) : Object.entries(obj).sort((a, b) => b[1] - a[1]); const mx = Math.max(1, ...it.map(x => x[1]));
+    return it.length ? `<div class="hbar">${it.map(([a, n]) => `<span>${esc(rot ? rot(a) : a)}</span><div class="tr"><i style="width:${(n / mx) * 100}%"></i></div><em>${n}</em>`).join('')}</div>` : '<p class="empty">Ainda sem dados.</p>'; };
+  // Colunas por dia
+  const mapa = Object.fromEntries((k.por_dia || []).map(x => [x.d, x.n]));
+  const n = Number(dias) > 31 ? 0 : Number(dias); const diasArr = [];
+  for (let i = n - 1; i >= 0; i--) { const t = new Date(Date.now() - i * 864e5); const iso = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(t); diasArr.push(iso); }
+  const lista = n ? diasArr.map(x => [x, mapa[x] || 0]) : Object.entries(mapa).sort();
+  const mxD = Math.max(1, ...lista.map(x => x[1]));
+  const passo = Math.ceil(lista.length / 10);
+  const colunas = lista.length ? `<div class="cols" role="img" aria-label="Novos clientes por dia">${lista.map(([x, v]) => `<div class="${v ? '' : 'zero'}" style="height:${v ? Math.max(4, (v / mxD) * 100) : 2}%" title="${dataBR(x)}: ${v}"></div>`).join('')}</div>
+    <div class="cols-x">${lista.map(([x], i) => `<span>${i % passo === 0 ? dataBR(x).slice(0, 5) : ''}</span>`).join('')}</div>` : '<p class="empty">Ainda sem dados.</p>';
+  // Horário de pico (mensagens dos clientes)
+  const horas = Array.from({ length: 24 }, (_, h) => [h, k.msgs_por_hora[h] || 0]);
+  const mxH = Math.max(1, ...horas.map(x => x[1]));
+  const pico = k.msgs_total ? `<div class="cols" style="height:110px">${horas.map(([h, v]) => `<div class="${v ? '' : 'zero'}" style="height:${v ? Math.max(4, (v / mxH) * 100) : 2}%" title="${h}h: ${v}"></div>`).join('')}</div>
+    <div class="cols-x">${horas.map(([h]) => `<span>${h % 3 === 0 ? h + 'h' : ''}</span>`).join('')}</div>` : '<p class="empty">Começa a contar quando a gravação das conversas estiver ligada.</p>';
+  const SEM = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' };
+  const marc = k.marcadas;
+  main.innerHTML = `${crumbs('Indicadores')}
+  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><h1 style="margin:0">Indicadores</h1>
+    <nav class="seg" aria-label="Período">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['365', '1 ano']].map(([v, t]) => `<a href="#/indicadores?d=${v}" class="${v === dias ? 'on' : ''}">${t}</a>`).join('')}</nav></div>
+  <div class="kpis">
+    ${kpi(tot, 'Clientes atendidos', `desde ${dataBR(k.desde)}`)}
+    ${kpi(marc, 'Consultas marcadas', `${pct(marc, tot)}% dos clientes`)}
+    ${kpi(pct(marc, tot) + '%', 'Taxa de agendamento', 'clientes que marcaram')}
+    ${kpi(k.proximas, 'Próximas consultas', 'de hoje em diante')}
+    ${kpi(k.andamento, 'Em andamento', 'esperando clínica ou cliente')}
+    ${kpi(k.com_equipe, 'Passados para a equipe', `${pct(k.com_equipe, tot)}% dos clientes`)}
+    ${kpi(k.sem_vaga, 'Clínica sem vaga', `${pct(k.sem_vaga, tot)}% dos clientes`)}
+    ${kpi(k.realizadas, 'Exames realizados', marc ? `${pct(k.realizadas, marc)}% das marcadas` : '')}
+  </div>
+  <div class="grid2">
+    <section class="panel"><h2>Situação dos clientes</h2>${rosca}</section>
+    <section class="panel"><h2>Novos clientes por dia</h2>${colunas}</section>
+    <section class="panel"><h2>De onde vieram</h2>${barras(k.por_origem)}
+      <p class="hint">O WhatsApp não informa se a pessoa usou celular ou computador, nem de qual página veio. Para separar site, Instagram e anúncios, cada canal precisa de um link de WhatsApp com uma frase própria. A Íris reconhece a frase e grava a origem aqui.</p></section>
+    <section class="panel"><h2>Mensagens no período</h2>${barras(k.msgs_por_origem, o => ORIGEM[o] || o)}
+      ${k.msgs_total ? '' : '<p class="hint">Começa a contar quando a gravação das conversas estiver ligada.</p>'}</section>
+    <section class="panel"><h2>Horário em que os clientes mais escrevem</h2>${pico}</section>
+    <section class="panel"><h2>Dia da semana das consultas</h2>${barras(Object.fromEntries(Object.entries(k.consultas_por_dia_semana || {}).sort((x, y) => x[0] - y[0]).map(([w, v]) => [SEM[w] || w, v])), null, true)}</section>
+  </div>
+  <p class="hint" style="margin-top:12px">Total de clientes desde o início: <b>${k.clientes_total}</b>. Só números aparecem aqui: nenhum nome, telefone ou CPF.</p>`;
+}
+
 /* ---------------- Eventos da página ---------------- */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act;
+  if (a === 'voltar') { if (PILHA.length > 1) history.back(); else location.hash = '#/'; return; }
+  if (a === 'topo') return window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (a === 'pular') return pular(b.dataset.o);
+  if (a === 'tela-esqueci') { S.tela = 'esqueci'; S.erro = ''; S.ok = ''; return rota(); }
+  if (a === 'tela-login') { S.tela = ''; S.erro = ''; S.ok = ''; return rota(); }
+  if (a === 'ver-senha') { ['p-senha', 'p-senha2'].forEach(i => { const el = $(i); if (el) el.type = b.checked ? 'text' : 'password'; }); return; }
+  if (a === 'zerar') {
+    if (!confirm('Zerar o código do celular desta pessoa? No próximo acesso ela vai cadastrar o código de novo.')) return;
+    return acaoUsuario({ acao: 'zerar_codigo', id: b.dataset.id }, 'Código zerado. A pessoa cadastra um novo no próximo acesso.');
+  }
   if (a === 'entrar') return entrar();
   if (a === 'esqueci') return esqueci();
   if (a === 'sair') { S.erro = ''; return sb.auth.signOut(); }
@@ -377,7 +528,17 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (['l-email', 'l-senha'].includes(e.target.id)) entrar();
+  if (e.target.id === 'r-email') esqueci();
   if (e.target.id === 'm-codigo') confirmarCodigo();
+});
+
+window.addEventListener('scroll', () => { const t = $('topo'); if (t) t.hidden = !S.session || window.scrollY < 500; }, { passive: true });
+// Guarda o caminho feito dentro do painel, para o botão Voltar nunca sair do painel.
+const PILHA = [location.hash || '#/'];
+window.addEventListener('hashchange', () => {
+  const h = location.hash || '#/';
+  if (PILHA.length > 1 && PILHA[PILHA.length - 2] === h) PILHA.pop(); else PILHA.push(h);
+  window.scrollTo(0, 0);
 });
 
 iniciar();

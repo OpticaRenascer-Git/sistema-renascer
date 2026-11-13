@@ -3,7 +3,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://sxjtelptvwtbytythycc.supabase.co; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex,nofollow">
-<title>Painel da Íris</title>
+<title>Painel Exame de Vista (Íris)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Nunito+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -109,15 +109,60 @@ table.t td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle
 .spin{color:var(--muted);font-size:14px;padding:8px 0}
 .empty{color:var(--muted);font-size:14px}
 @media (prefers-reduced-motion:no-preference){.panel,.card{animation:in .18s ease-out}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+
+header.top .brand small{font-weight:600;color:var(--muted);font-size:14px}
+.navbar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;margin-top:8px;background:var(--bg)}
+.navbar .crumbs{margin:0 0 0 6px}
+.topo[hidden]{display:none}
+.topo{position:fixed;right:16px;bottom:18px;z-index:6;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.legend button{font:inherit;font-weight:700;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;display:inline-flex;align-items:center}
+.legend button:hover{border-color:var(--brand)}
+.legend button:disabled{opacity:.45;cursor:default}
+.legend button em{font-style:normal;color:var(--muted);margin-left:5px;font-variant-numeric:tabular-nums}
+.bub.flash{outline:3px solid var(--brand);outline-offset:2px}
+.agenda{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.agenda .topo-ag{background:var(--sunk);padding:10px 12px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.agenda table{width:100%;border-collapse:collapse;font-size:14px}
+.agenda th{text-align:left;color:var(--muted);font-weight:700;padding:8px 12px;width:92px;vertical-align:top}
+.agenda td{padding:8px 12px;overflow-wrap:anywhere}
+.agenda tr+tr th,.agenda tr+tr td{border-top:1px solid var(--line)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px}
+@media (min-width:900px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi b{font-family:var(--f-display);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:13px;font-weight:700}
+.kpi small{color:var(--muted);font-size:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;margin-top:14px}
+.donut{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.donut .ring{width:150px;height:150px;border-radius:50%;position:relative;flex:none}
+.donut .ring::after{content:"";position:absolute;inset:26px;border-radius:50%;background:var(--surface)}
+.donut .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;font-size:12px;color:var(--muted);font-weight:700}
+.donut .mid b{font-family:var(--f-display);font-size:26px;color:var(--fg)}
+.leg{display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px}
+.hbar{display:grid;grid-template-columns:minmax(90px,140px) 1fr auto;gap:8px 10px;align-items:center;font-size:13.5px}
+.hbar .tr{height:12px;border-radius:6px;background:var(--sunk);overflow:hidden}
+.hbar .tr i{display:block;height:100%;background:var(--brand);border-radius:6px}
+.hbar em{font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}
+.cols{display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:8px;border-bottom:1px solid var(--line)}
+.cols div{flex:1;background:var(--brand);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.cols div.zero{background:var(--sunk)}
+.cols-x{display:flex;gap:3px;font-size:11px;color:var(--muted);margin-top:4px}
+.cols-x span{flex:1;width:0;white-space:nowrap;overflow:visible}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg a{padding:7px 12px;text-decoration:none;color:var(--fg);font-weight:700;font-size:13.5px}
+.seg a.on{background:var(--brand);color:var(--on-brand)}
+.acoes{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head><body>
 <div class="wrap">
   <header class="top">
-    <a class="brand" href="#/"><img class="logo-light" src="logo-light.svg" alt="Óptica Renascer"><img class="logo-dark" src="logo-dark.svg" alt="Óptica Renascer"><span>Painel da Íris</span></a>
+    <a class="brand" href="#/"><img class="logo-light" src="logo-light.svg" alt="Óptica Renascer"><img class="logo-dark" src="logo-dark.svg" alt="Óptica Renascer"><span>Painel Exame de Vista <small>(Íris)</small></span></a>
     <div class="who" id="who"></div>
   </header>
   <main id="main"><p class="spin">Carregando...</p></main>
 </div>
+<button class="btn small topo" id="topo" data-act="topo" hidden>↑ Voltar ao topo</button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 </body></html>
