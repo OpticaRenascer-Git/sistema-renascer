@@ -10,7 +10,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 const ORIGENS = (Deno.env.get('PAINEL_ORIGENS') ??
   'https://www.opticarenascergoexame.com.br,https://opticarenascergoexame.com.br,https://painel-exame-de-vista.vercel.app')
   .split(',').map((x) => x.trim()).filter(Boolean);
-const REDIRECT = Deno.env.get('PAINEL_REDIRECT') ?? 'https://painel-exame-de-vista.vercel.app/';
+const REDIRECT = Deno.env.get('PAINEL_REDIRECT') ?? 'https://www.opticarenascergoexame.com.br/';
 const PAPEIS = ['administrador', 'visualizador'];
 
 const permitida = (req: Request) => ORIGENS.includes(req.headers.get('origin') ?? '');

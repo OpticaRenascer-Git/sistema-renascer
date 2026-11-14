@@ -2,7 +2,7 @@
 // Banco: Supabase da Íris. A chave abaixo é a chave PÚBLICA (publishable): ela sozinha não abre dado nenhum.
 // Quem protege os dados: login com código de verificação (2 etapas) + funções do banco que conferem o perfil.
 // O painel saiu do GitHub Pages: quem abrir o endereço antigo vai para o endereço novo.
-const ENDERECO_NOVO = 'https://painel-exame-de-vista.vercel.app/';
+const ENDERECO_NOVO = 'https://www.opticarenascergoexame.com.br/';
 if (location.hostname.endsWith('github.io')) { location.replace(ENDERECO_NOVO); throw new Error('O painel mudou de endereço.'); }
 const SUPABASE_URL = 'https://sxjtelptvwtbytythycc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_G6EfiB9oi5LiMrjTT6FeHw_amjZhdvi';
